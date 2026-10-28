@@ -1,0 +1,49 @@
+--- a/src/util/fs_path.c
++++ b/src/util/fs_path.c
+@@ -1691,9 +1691,10 @@
+ 	size_t utf8_char_len)
+ {
+ 	GIT_UNUSED(path);
+-	GIT_UNUSED(len);
+-
+-	return (utf8_char_len <= MAX_PATH);
++	GIT_UNUSED(utf8_char_len);
++
++	/* Embedded Nyra backend exports bare trees; no worktree checkout. */
++	return (len < GIT_WIN_PATH_MAX);
+ }
+ #endif
+ 
+@@ -1770,11 +1771,14 @@
+ 	size_t suffix_len)
+ {
+ #ifdef GIT_WIN32
+-	size_t utf8_len = git_utf8_char_length(path->ptr, path->size);
++	/* Nyra's bare package cache uses libgit2's extended Win32 paths.
++	 * Bound UTF-8 bytes conservatively by the native path buffer; this
++	 * also bounds UTF-16 units, including surrogate pairs. */
++	size_t utf8_len = path->size;
+ 	size_t total_len;
+ 
+ 	if (GIT_ADD_SIZET_OVERFLOW(&total_len, utf8_len, suffix_len) ||
+-	    total_len > MAX_PATH) {
++	    total_len >= GIT_WIN_PATH_MAX) {
+ 
+ 		git_error_set(GIT_ERROR_FILESYSTEM, "path too long: '%.*s'",
+ 			(int)path->size, path->ptr);
+--- a/src/util/fs_path.h
++++ b/src/util/fs_path.h
+@@ -721,10 +721,11 @@
+ #ifdef GIT_WIN32
+ 	size_t path_chars, total_chars;
+ 
+-	path_chars = git_utf8_char_length(path, path_len);
++	/* Match the extended-path buffer used for bare repository I/O. */
++	path_chars = path_len == SIZE_MAX ? strlen(path) : path_len;
+ 
+ 	if (GIT_ADD_SIZET_OVERFLOW(&total_chars, path_chars, suffix_len) ||
+-	    total_chars > MAX_PATH) {
++	    total_chars >= GIT_WIN_PATH_MAX) {
+ 		git_error_set(GIT_ERROR_FILESYSTEM, "path too long: '%s'", path);
+ 		return -1;
+ 	}

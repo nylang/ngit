@@ -1,0 +1,10 @@
+name: ngit
+version: 0.1.0
+license: MIT
+directories:
+  interface:
+    - interface
+  public:
+    - public
+  private:
+    - private

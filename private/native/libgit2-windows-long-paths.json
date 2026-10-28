@@ -1,0 +1,16 @@
+{
+  "path": "share/nyra/sources/libgit2-windows-long-paths.patch",
+  "sha256": "8dd354c739af196e5cedd84cc34663326ac67426c88dfa036e228d036233bd46",
+  "files": [
+    {
+      "path": "src/util/fs_path.c",
+      "original_sha256": "a83d88cf4be0177e0f7bc2ddf992efae1b65a4776f465dbdb91fc66d4abf83c3",
+      "patched_sha256": "e17181a645788092dee028ae6407581e3f7ff497a9ec9ec2807f63d27a16689a"
+    },
+    {
+      "path": "src/util/fs_path.h",
+      "original_sha256": "b6b6e60b94c3327de03fb4b19460d83b681bd442adf3d3777bc81e03f37ae340",
+      "patched_sha256": "586d0ab08797a98442dc22b6f75e9c9769b6e697620f1ae0d687568292d3eb1f"
+    }
+  ]
+}

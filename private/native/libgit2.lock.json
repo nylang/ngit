@@ -1,0 +1,11 @@
+{
+  "version": "1.9.7",
+  "url": "https://codeload.github.com/libgit2/libgit2/tar.gz/refs/tags/v1.9.7",
+  "sha256": "1a4fbe7589e814777ae76b64734ad80f4ecad22cd33a22682a2aaea4ae5375e7",
+  "license": "GPL-2.0-only WITH linking exception (see upstream COPYING)",
+  "https_provider": "OpenSSL",
+  "ssh_provider": "disabled",
+  "gssapi": false,
+  "bundled_zlib": true,
+  "regex_backend": "builtin"
+}
