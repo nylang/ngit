@@ -4,6 +4,18 @@
 /* Private UTF-8 filesystem adapter. No process policy or drive mappings. */
 #ifndef NGIT_PRIVATE_WINDOWS_PATHS_H
 #define NGIT_PRIVATE_WINDOWS_PATHS_H
+
+/* Keep this adapter independent of its includer's system-header order. */
+#include <windows.h>
+#include <direct.h>
+#include <errno.h>
+#include <io.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <wchar.h>
+
 static wchar_t *windows_path(const char *path) {
     int size=MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,path,-1,NULL,0);
     if(!size||size>32760)return NULL;
@@ -23,12 +35,6 @@ static wchar_t *windows_path(const char *path) {
     wchar_t *result=malloc(length*sizeof(wchar_t));if(result){
         wcscpy(result,unc?L"\\\\?\\UNC\\":L"\\\\?\\");wcscat(result,absolute+(unc?2:0));}
     free(absolute);return result;
-}
-static char *windows_utf8(const wchar_t *text) {
-    int size=WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,text,-1,NULL,0,NULL,NULL);
-    if(!size)return NULL;char *result=malloc((size_t)size);if(!result)return NULL;
-    if(!WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,text,-1,result,size,NULL,NULL)){free(result);return NULL;}
-    return result;
 }
 static int windows_mkdir(const char *path) {
     wchar_t *wide=windows_path(path);if(!wide){errno=EINVAL;return -1;}
