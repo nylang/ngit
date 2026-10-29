@@ -1,3 +1,6 @@
+// Copyright (c) 2026 tangxiangjiang
+// SPDX-License-Identifier: MIT
+
 /**
  * @brief Git acquisition and immutable source snapshots, independent of package management.
  * @note This initial API is a snapshot subset, not a complete libgit2 binding.

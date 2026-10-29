@@ -1,3 +1,6 @@
+# Copyright (c) 2026 tangxiangjiang
+# SPDX-License-Identifier: MIT
+
 """Apply the retained, exact-source Windows libgit2 path-buffer correction."""
 from __future__ import annotations
 import hashlib

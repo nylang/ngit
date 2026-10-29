@@ -1,0 +1,75 @@
+// Copyright (c) 2026 tangxiangjiang
+// SPDX-License-Identifier: MIT
+
+/** @brief Public snapshot and scoped-lock acceptance consumer; no private provider imports. */
+import "stdlib:stdlib.ny";
+import "ngit:ngit.ny";
+
+func main(args: ref <string>[]) -> int32 {
+  if args.length < 3 {
+    return 2;
+  }
+
+  if args[1] == "lock" {
+    let timeout: int32 = 100;
+    var made: Result<FileLock, IoError> = FileLock.Acquire(args[2], timeout);
+    if made.IsErr() {
+      return 8;
+    }
+
+    var guard: FileLock = move((made.get_if<FileLock>()) as FileLock);
+    var adopted: FileLock = move(guard);
+    Console.Println("locked");
+    if args.length > 3 && args[3] == "hold" {
+      Thread.Sleep(1000u32);
+    }
+
+    return 0;
+  }
+
+  if args.length != 7 {
+    return 2;
+  }
+
+  var timeout_ms: int32 = 2000;
+  if args[6] == "short" {
+    timeout_ms = 100;
+  }
+
+  let prepared: Result<GitSnapshot, GitError> = Git.PrepareSnapshot(
+    args[2], args[3], args[4], args[5] == "offline", timeout_ms
+  );
+  if prepared.IsErr() {
+    let error: GitError = (prepared.get_if<GitError>()) as GitError;
+    if error == GitError.UnsupportedOrigin {
+      return 11;
+    }
+    if error == GitError.CacheFailure {
+      return 12;
+    }
+    if error == GitError.RevisionUnavailable {
+      return 13;
+    }
+    if error == GitError.UnsupportedTree {
+      return 14;
+    }
+    if error == GitError.OfflineMiss {
+      return 15;
+    }
+    if error == GitError.InvalidResult {
+      return 16;
+    }
+    if error == GitError.UnsupportedObjectFormat {
+      return 17;
+    }
+
+    return 10;
+  }
+
+  let snapshot: GitSnapshot = (prepared.get_if<GitSnapshot>()) as GitSnapshot;
+  Console.Println(snapshot.Commit());
+  Console.Println(snapshot.ContentDigest());
+  Console.Println(snapshot.RelativePath());
+
+  return 0;
+}

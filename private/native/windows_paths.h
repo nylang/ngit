@@ -1,3 +1,6 @@
+// Copyright (c) 2026 tangxiangjiang
+// SPDX-License-Identifier: MIT
+
 /* Private UTF-8 filesystem adapter. No process policy or drive mappings. */
 #ifndef NGIT_PRIVATE_WINDOWS_PATHS_H
 #define NGIT_PRIVATE_WINDOWS_PATHS_H

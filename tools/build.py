@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 tangxiangjiang
+# SPDX-License-Identifier: MIT
+
 """Build ngit's pinned static C backend; no NyraLang private repository is required."""
 from __future__ import annotations
 import argparse

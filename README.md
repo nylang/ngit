@@ -84,7 +84,8 @@ subprocess.run(["nyrac", "build", "main.ny", "--link", *link_args], check=True)
 
 The build preserves the Windows libgit2 long-path patch and its exact original/
 patched source hashes. Build receipts describe construction, not test acceptance.
-No build or runtime validation was performed for this initial extraction.
+The initial extraction was source-only; the subsequent source closeout below
+records its own verification scope.
 
 ## Runtime policy and limits
 
@@ -115,3 +116,49 @@ ngit does not certify a caller-modified cached directory on reuse.
 ngit's authored wrapper and tools use [MIT](LICENSE). libgit2 and OpenSSL retain
 their own licenses; linked binaries must carry the corresponding notices and
 source/patch obligations. See [THIRD_PARTY.md](THIRD_PARTY.md).
+
+## Module architecture
+
+See [module responsibilities, ownership and dependency boundaries](ARCHITECTURE.md).
+
+## Source refactor requirement (1.0.4 integration)
+
+The current store transaction is implemented in Nyra using stdlib `FileLock`;
+its native bridge provides bounded Git operations. Building this worktree
+requires the matching 1.0.4 source stdlib/platform ABI 10, rather than mixing it
+with an older SDK runtime archive. See [ARCHITECTURE.md](ARCHITECTURE.md) for
+ownership and verification. This source change is not a new release
+or a replacement acceptance receipt.
+
+## Verification
+
+On macOS arm64, the 2026-10-29 source closeout passes all five Nyra unit tests,
+27 public-consumer integration checks, and production precompilation with no
+test symbols. Native invalid-input and output-bound checks also pass. Other
+host platforms and SDK release qualification are not claimed by this run.
+
+Use a compiler with the borrowed-string index fix and a matching runtime with
+`FileLock`/platform ABI 10. After building the native backend above, run on a
+POSIX host:
+
+```sh
+python3 tests/run.py \
+  --compiler /path/to/nyrac --sdk /path/to/sdk \
+  --platform-archive /path/to/libnyra_platform.a \
+  --link-args /absolute/path/to/cache/native/link-args.json \
+  --openssl /path/to/openssl --out-dir cache/acceptance
+```
+
+The output directory must be new. The runner stages a private workspace, checks
+the package, runs its units, builds `tests/data/consumer.ny.in`, precompiles the
+production package and inspects its symbols, then runs `tests/accept.py`.
+`report.json` records results and compiler/runtime hashes. For source-runtime
+integration, add `--runtime-source /path/to/source` containing `kernel`, `stdlib`
+and `ntest`; the overlay changes only staged manifests. Published dependencies
+and installed SDKs are untouched.
+
+Git and OpenSSL executables construct local fixtures; the Nyra consumer receives
+an empty PATH. The HTTPS fixture uses a temporary certificate and authenticated
+smart-Git server. No external service, credential or remote repository is needed.
+The POSIX harness uses OS locks directly to observe contention; Windows needs a
+corresponding host harness before claiming Windows acceptance.
