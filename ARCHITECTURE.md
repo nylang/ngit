@@ -42,12 +42,13 @@ hash and `nyra-package-content-v1` content framing remain the store contract.
 Staged clone/export paths belong to the Nyra transaction. Native code returns
 only commit/content identity; Nyra constructs the cache-relative result path.
 
-This source now requires the 1.0.4 stdlib `FileLock` capability and its matching
-platform ABI 10 archive. The old private monolithic native entry is replaced by
+The current development API requires the matching Nyra SDK 1.0.5 compiler and
+runtime. It also retains the scoped stdlib `FileLock` capability and matching
+platform ABI 10 substrate introduced in 1.0.4. The old private monolithic native entry is replaced by
 three provider operations, so old native archives cannot be mixed with this
 source. No release/version tag or public Git API was changed by this refactor.
 
-## Verification
+## Historical refactor verification
 
 The 2026-10-29 macOS arm64 closeout passes semantic checking, all five package
 unit tests, production precompilation without test symbols, and 27 public Nyra
