@@ -4,7 +4,7 @@ Development API 0.2.0 requires a matching Nyra SDK 1.0.5 or newer.
 Rebuild precompiled consumers against the matching interfaces and runtime.
 
 Nyra bindings and a private C adapter for libgit2-backed source snapshots.
-Independently versioned **0.1.0**, licensed under MIT.
+Independently versioned **0.2.0**, licensed under MIT.
 Repository: <https://github.com/nylang/ngit>.
 
 This initial API resolves Git revisions and materializes bounded immutable
@@ -49,7 +49,7 @@ private workspace paths. An application's package.yaml can declare:
 dependencies:
   ngit:
     git: https://github.com/nylang/ngit.git
-    rev: main
+    rev: 5745ebf696272c4ec21d5f7a0d70a7f750fcbcf7
 ```
 
 Use `nyra lock` to resolve the selector and commit the generated lock, then
@@ -172,5 +172,5 @@ corresponding host harness before claiming Windows acceptance.
 1.0.5 P7 analyzer candidate (or a later SDK containing those rules); the
 published 1.0.4 analyzer does not implement them. `import: default` inherits
 the selected workspace profile when present, otherwise analyzer SDK defaults.
-No sibling source path is required. Run `nyra-analyzer lint . --json`. Existing
-violations remain migration debt; lint success is not runtime qualification.
+No sibling source path is required. Run `nyra-analyzer lint . --json`. Lint checks
+coding rules; runtime qualification is a separate gate.
