@@ -8,8 +8,24 @@ import "interface/git.ni";
 import "public/git.ny";
 import "private/provider.ny";
 
+/**
+ * @brief Selected immutable Git cache root and transport controls for one operation.
+ * @note Owns store/lock/stage publication policy; provider owns native transport,
+ *       and GitSnapshot owns framing. Excludes package manifests and workspace policy.
+ */
+pub struct GitStore {
+  root: string;
+  provider: GitProvider;
+}
+
+/** @brief Retain the selected store root and transport controls without performing I/O.
+ * @returns A store value; language drop releases its root string, not cached files. */
+pub static method(GitStore) New(root: ref string, offline: bool, timeout_ms: int32) -> GitStore {
+  return GitStore{root: copy(root), provider: GitProvider.New(offline, timeout_ms)};
+}
+
 // This is input framing, not platform path conversion or authentication policy.
-func git_store_input(value: ref string) -> bool {
+static method(GitStore) InputValid(value: ref string) -> bool {
   if value.length <= 0 || value.length > 32768 {
     return false;
   }
@@ -27,7 +43,7 @@ func git_store_input(value: ref string) -> bool {
   return true;
 }
 
-func git_store_origin(origin: ref string) -> bool {
+static method(GitStore) OriginValid(origin: ref string) -> bool {
   if origin.StartsWith("https://") {
     let rest: string = origin.Slice(8, origin.length);
     let slash: int32 = rest.Find("/");
@@ -47,40 +63,6 @@ func git_store_origin(origin: ref string) -> bool {
 // Reclaim stage contents without traversing a stale symlink into another owner.
 // Fresh provider exports reject links; stale or interrupted stages need the same
 // no-follow cleanup contract as the preceding native transaction implementation.
-func git_remove_stage(path: ref string) -> Result<Unit, IoError> {
-  let observed: Result<FileSystemEntryKind, IoError> = Path.Kind(path);
-  if observed.IsErr() {
-    return (observed.get_if<IoError>()) as IoError;
-  }
-
-  let kind: FileSystemEntryKind = (observed.get_if<FileSystemEntryKind>()) as FileSystemEntryKind;
-  if kind == FileSystemEntryKind.Missing {
-    return Unit{};
-  }
-
-  if kind != FileSystemEntryKind.Directory {
-    return Link.New(path).Delete();
-  }
-
-  let listed: Result<DirectoryList, IoError> = Directory.New(path).List();
-  if listed.IsErr() {
-    return (listed.get_if<IoError>()) as IoError;
-  }
-
-  let entries: DirectoryList = (listed.get_if<DirectoryList>()) as DirectoryList;
-  var index: int32 = 0;
-  while index < entries.Len() {
-    let removed: Result<Unit, IoError> = git_remove_stage(entries.Get(index));
-    if removed.IsErr() {
-      return (removed.get_if<IoError>()) as IoError;
-    }
-
-    index = index + 1;
-  }
-
-  return Directory.New(path).Delete();
-}
-
 // An operation only removes its own stage. The origin lock outlives this owner.
 @scoped struct GitStage {
   path: string;
@@ -88,7 +70,7 @@ func git_remove_stage(path: ref string) -> Result<Unit, IoError> {
 
 method(GitStage) operator drop() -> void {
   if self.path.length > 0 {
-    let ignored: Result<Unit, IoError> = git_remove_stage(self.path);
+    let ignored: Result<Unit, IoError> = Path.DeleteTreeNoFollow(self.path);
   }
 }
 
@@ -99,7 +81,7 @@ method(GitStage) operator move() -> GitStage {
   return GitStage{ path: move(path) };
 }
 
-func git_reclaim_stages(root: string, key: string) -> void {
+static method(GitStage) Reclaim(root: string, key: string) -> void {
   let read: Result<DirectoryList, IoError> = Directory.New(root).List();
   let entries: DirectoryList? = read.get_if<DirectoryList>();
   if entries == nil {
@@ -118,26 +100,28 @@ func git_reclaim_stages(root: string, key: string) -> void {
     }
 
     if name.Slice(separator, name.length).StartsWith(prefix) {
-      let ignored: Result<Unit, IoError> = git_remove_stage(path);
+      let ignored: Result<Unit, IoError> = Path.DeleteTreeNoFollow(path);
     }
 
     index = index + 1;
   }
 }
 
-/** @brief Prepare the stable git/packages/locks/staging store layout and immutable snapshot. */
-pub func GitPrepareStoredSnapshot(
+/** @brief Acquire and publish an immutable snapshot under the existing origin/content locks.
+ * @returns An owned snapshot, or GitError without publishing an invalid snapshot. */
+pub method(GitStore) Prepare(
   origin: ref string,
-  revision: ref string,
-  store: ref string,
-  offline: bool,
-  timeout_ms: int32
+  revision: ref string
 ) -> Result<GitSnapshot, GitError> {
-  if !git_store_input(origin) || !git_store_input(revision) || !git_store_input(store) {
+  let store: string = self.root;
+  let offline: bool = self.provider.IsOffline();
+  let timeout_ms: int32 = self.provider.Timeout();
+
+  if !GitStore.InputValid(origin) || !GitStore.InputValid(revision) || !GitStore.InputValid(store) {
     return GitError.CacheFailure;
   }
 
-  if !git_store_origin(origin) {
+  if !GitStore.OriginValid(origin) {
     return GitError.UnsupportedOrigin;
   }
 
@@ -156,7 +140,7 @@ pub func GitPrepareStoredSnapshot(
     return GitError.CacheFailure;
   }
 
-  let digest: Result<string, GitError> = GitProviderDigest(origin);
+  let digest: Result<string, GitError> = self.provider.OriginDigest(origin);
   let key_value: string? = digest.get_if<string>();
   if key_value == nil {
     return GitError.CacheFailure;
@@ -171,7 +155,7 @@ pub func GitPrepareStoredSnapshot(
   }
 
   var origin_guard: FileLock = origin_value as FileLock;
-  git_reclaim_stages(staging, key);
+  GitStage.Reclaim(staging, key);
   let created: Result<Directory, IoError> = Directory.New(staging).CreateTemp("op-".Concat(key).Concat("-"));
   let stage_value: Directory? = created.get_if<Directory>();
   if stage_value == nil {
@@ -181,7 +165,7 @@ pub func GitPrepareStoredSnapshot(
   let stage_directory: Directory = stage_value as Directory;
   var stage: GitStage = GitStage{ path: copy(stage_directory.Path()) };
   let clone: string = Path.Join(stage.path, "repository");
-  let prepared: Result<bool, GitError> = GitProviderPrepare(origin, repository, clone, offline, timeout_ms);
+  let prepared: Result<bool, GitError> = self.provider.Prepare(origin, repository, clone);
   let prepare_error: GitError? = prepared.get_if<GitError>();
   if prepare_error != nil {
     return prepare_error as GitError;
@@ -197,9 +181,7 @@ pub func GitPrepareStoredSnapshot(
   }
 
   let exported_path: string = Path.Join(stage.path, "content");
-  let exported: Result<GitSnapshot, GitError> = GitProviderExport(
-    origin, revision, repository, exported_path, offline, timeout_ms
-  );
+  let exported: Result<GitSnapshot, GitError> = self.provider.Export(origin, revision, repository, exported_path);
   let export_error: GitError? = exported.get_if<GitError>();
   if export_error != nil {
     return export_error as GitError;
@@ -212,7 +194,9 @@ pub func GitPrepareStoredSnapshot(
 
   let snapshot: GitSnapshot = snapshot_value as GitSnapshot;
   let target: string = Path.Join(packages, snapshot.ContentDigest());
-  let content_locked: Result<FileLock, IoError> = FileLock.Acquire(Path.Join(locks, snapshot.ContentDigest()), timeout_ms);
+  let content_locked: Result<FileLock, IoError> = FileLock.Acquire(
+    Path.Join(locks, snapshot.ContentDigest()), timeout_ms
+  );
   let content_value: FileLock? = content_locked.get_if<FileLock>();
   if content_value == nil {
     return GitError.CacheFailure;

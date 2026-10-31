@@ -7,7 +7,7 @@ import "stdlib:stdlib.ny";
 import "interface/git.ni";
 import "public/git.ny";
 
-func git_lower_hex(value: ref string, length: int32) -> bool {
+static method(GitSnapshot) LowerHex(value: ref string, length: int32) -> bool {
   if value.length != length {
     return false;
   }
@@ -28,7 +28,7 @@ func git_lower_hex(value: ref string, length: int32) -> bool {
 /** @brief Validate native result framing, canonical path and exact requested commit.
  * @returns An owned snapshot or InvalidResult; input strings remain borrowed.
  */
-pub func GitDecodeSnapshot(text: ref string, revision: ref string) -> Result<GitSnapshot, GitError> {
+pub static method(GitSnapshot) Decode(text: ref string, revision: ref string) -> Result<GitSnapshot, GitError> {
   let first: int32 = text.Find("\n");
   if first != 40 {
     return GitError.InvalidResult;
@@ -43,13 +43,13 @@ pub func GitDecodeSnapshot(text: ref string, revision: ref string) -> Result<Git
   let commit: string = text.Slice(0, first);
   let content: string = tail.Slice(0, second);
   let relative: string = tail.Slice(second + 1, tail.length);
-  if !git_lower_hex(commit, 40)
-    || !git_lower_hex(content, 64)
+  if !GitSnapshot.LowerHex(commit, 40)
+    || !GitSnapshot.LowerHex(content, 64)
     || relative != "packages/".Concat(content).Concat("/content") {
     return GitError.InvalidResult;
   }
 
-  if git_lower_hex(revision, 40) && commit != revision {
+  if GitSnapshot.LowerHex(revision, 40) && commit != revision {
     return GitError.InvalidResult;
   }
 

@@ -9,7 +9,31 @@ import "public/git.ny";
 import "private/git_c.ni";
 import "private/result.ny";
 
-func git_status_error(status: int32) -> GitError {
+/** @brief Native call controls; excludes cache paths, locking and package metadata. */
+pub struct GitProvider {
+  offline: bool;
+  timeout_ms: int32;
+}
+
+/** @brief Configure the embedded provider without creating a native handle.
+ * @returns A value retaining the explicit timeout/offline controls. */
+pub static method(GitProvider) New(offline: bool, timeout_ms: int32) -> GitProvider {
+  return GitProvider{offline: offline, timeout_ms: timeout_ms};
+}
+
+/** @brief Read the operation's network admission policy.
+ * @returns True when this provider must avoid network acquisition. */
+pub method(GitProvider) IsOffline() -> bool {
+  return self.offline;
+}
+
+/** @brief Read the operation's bounded transport/lock timeout.
+ * @returns The caller-selected millisecond bound. */
+pub method(GitProvider) Timeout() -> int32 {
+  return self.timeout_ms;
+}
+
+static method(GitError) FromProviderStatus(status: int32) -> GitError {
   if status == -2 {
     return GitError.UnsupportedOrigin;
   }
@@ -38,12 +62,9 @@ func git_status_error(status: int32) -> GitError {
 }
 
 // Copy native result bytes before their call-local array owner is released.
-func git_copy_output(bytes: *const int8, count: int32) -> string {
-  return string.ViewFrom(bytes, count).Substring(0, count);
-}
-
-/** @brief Hash exact origin bytes; caller chooses the store identity policy. */
-pub func GitProviderDigest(origin: ref string) -> Result<string, GitError> {
+/** @brief Hash exact origin bytes for the selected cache identity.
+ * @returns An owned lowercase digest, or CacheFailure for invalid native output. */
+pub method(GitProvider) OriginDigest(origin: ref string) -> Result<string, GitError> {
   var bytes: owned <int8>[] = new <int8>[65];
   unsafe {
     let count: int32 = ngit_hash_bytes(origin.data as *const int8, origin.length, &mut bytes[0], 65);
@@ -51,19 +72,21 @@ pub func GitProviderDigest(origin: ref string) -> Result<string, GitError> {
       return GitError.CacheFailure;
     }
 
-    let result: Result<string, GitError> = git_copy_output(&bytes[0] as *const int8, count);
+    let result: Result<string, GitError> = string.ViewFrom(&bytes[0] as *const int8, count).Substring(0, count);
     return result;
   }
 }
 
-/** @brief Clone into a caller-owned path, or report that the repository exists. */
-pub func GitProviderPrepare(
+/** @brief Prepare a repository with this operation's transport controls.
+ * @returns True for a staged clone, false for an existing repository, or a redacted error. */
+pub method(GitProvider) Prepare(
   origin: ref string,
   repository: ref string,
-  clone: ref string,
-  offline: bool,
-  timeout_ms: int32
+  clone: ref string
 ) -> Result<bool, GitError> {
+  let offline: bool = self.offline;
+  let timeout_ms: int32 = self.timeout_ms;
+
   var offline_flag: int32 = 0;
   if offline {
     offline_flag = 1;
@@ -76,7 +99,7 @@ pub func GitProviderPrepare(
     offline_flag, timeout_ms
   );
   if status < 0 {
-    return git_status_error(status);
+    return GitError.FromProviderStatus(status);
   }
 
   if status > 1 {
@@ -87,15 +110,17 @@ pub func GitProviderPrepare(
   return result;
 }
 
-/** @brief Resolve/export one bounded tree; all returned snapshot strings are owned. */
-pub func GitProviderExport(
+/** @brief Export one bounded tree and retain validated snapshot identity.
+ * @returns An owned GitSnapshot or a redacted provider/framing error. */
+pub method(GitProvider) Export(
   origin: ref string,
   revision: ref string,
   repository: ref string,
-  destination: ref string,
-  offline: bool,
-  timeout_ms: int32
+  destination: ref string
 ) -> Result<GitSnapshot, GitError> {
+  let offline: bool = self.offline;
+  let timeout_ms: int32 = self.timeout_ms;
+
   var bytes: owned <int8>[] = new <int8>[512];
   var offline_flag: int32 = 0;
   if offline {
@@ -114,7 +139,7 @@ pub func GitProviderExport(
   }
 
   if count < 0 {
-    return git_status_error(count);
+    return GitError.FromProviderStatus(count);
   }
 
   if count != 105 {
@@ -123,12 +148,12 @@ pub func GitProviderExport(
 
   var text: string = "";
   unsafe {
-    text = git_copy_output(&bytes[0] as *const int8, count);
+    text = string.ViewFrom(&bytes[0] as *const int8, count).Substring(0, count);
   }
 
   // Native output is only commit/digest; cache-relative paths are Nyra policy.
   let content: string = text.Slice(41, text.length);
-  return GitDecodeSnapshot(
+  return GitSnapshot.Decode(
     text.Concat("\npackages/").Concat(content).Concat("/content"),
     revision
   );

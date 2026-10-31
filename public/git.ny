@@ -17,17 +17,20 @@ pub struct GitSnapshot {
   relative_path: string;
 }
 
-/** @brief Return the language-owned commit identity, with normal string copy semantics. */
+/** @brief Read the retained commit identity.
+ * @returns The owned lowercase SHA-1 identity. */
 pub method(GitSnapshot) Commit() -> string {
   return self.commit;
 }
 
-/** @brief Return the language-owned canonical content digest. */
+/** @brief Read the retained canonical content identity.
+ * @returns The owned lowercase SHA256 identity. */
 pub method(GitSnapshot) ContentDigest() -> string {
   return self.content;
 }
 
-/** @brief Return the language-owned store-relative snapshot path. */
+/** @brief Read the immutable store-relative snapshot directory.
+ * @returns An owned relative path; cached files remain in the caller's store. */
 pub method(GitSnapshot) RelativePath() -> string {
   return self.relative_path;
 }

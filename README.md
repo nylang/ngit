@@ -1,5 +1,8 @@
 # ngit
 
+Development API 0.2.0 requires a matching Nyra SDK 1.0.5 or newer.
+Rebuild precompiled consumers against the matching interfaces and runtime.
+
 Nyra bindings and a private C adapter for libgit2-backed source snapshots.
 Independently versioned **0.1.0**, licensed under MIT.
 Repository: <https://github.com/nylang/ngit>.
@@ -121,11 +124,11 @@ source/patch obligations. See [THIRD_PARTY.md](THIRD_PARTY.md).
 
 See [module responsibilities, ownership and dependency boundaries](ARCHITECTURE.md).
 
-## Source refactor requirement (1.0.4 integration)
+## Source refactor requirement (1.0.5 integration)
 
 The current store transaction is implemented in Nyra using stdlib `FileLock`;
 its native bridge provides bounded Git operations. Building this worktree
-requires the matching 1.0.4 source stdlib/platform ABI 10, rather than mixing it
+requires the matching 1.0.5 source stdlib (`Path.DeleteTreeNoFollow`) and platform ABI 10, rather than mixing it
 with an older SDK runtime archive. See [ARCHITECTURE.md](ARCHITECTURE.md) for
 ownership and verification. This source change is not a new release
 or a replacement acceptance receipt.
@@ -138,7 +141,7 @@ test symbols. Native invalid-input and output-bound checks also pass. Other
 host platforms and SDK release qualification are not claimed by this run.
 
 Use a compiler with the borrowed-string index fix and a matching runtime with
-`FileLock`/platform ABI 10. After building the native backend above, run on a
+`FileLock`, `Path.DeleteTreeNoFollow` and platform ABI 10. After building the native backend above, run on a
 POSIX host:
 
 ```sh
@@ -162,3 +165,12 @@ an empty PATH. The HTTPS fixture uses a temporary certificate and authenticated
 smart-Git server. No external service, credential or remote repository is needed.
 The POSIX harness uses OS locks directly to observe contention; Windows needs a
 corresponding host harness before claiming Windows acceptance.
+
+## Coding-rule lint
+
+`package.yaml` selects the portable `lint.yaml` profile. It requires the
+1.0.5 P7 analyzer candidate (or a later SDK containing those rules); the
+published 1.0.4 analyzer does not implement them. `import: default` inherits
+the selected workspace profile when present, otherwise analyzer SDK defaults.
+No sibling source path is required. Run `nyra-analyzer lint . --json`. Existing
+violations remain migration debt; lint success is not runtime qualification.

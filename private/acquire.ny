@@ -8,13 +8,8 @@ import "interface/git.ni";
 import "public/git.ny";
 import "private/store.ny";
 
-func git_error(error: GitError) -> Result<GitSnapshot, GitError> {
-  let result: Result<GitSnapshot, GitError> = error;
-
-  return result;
-}
-
-/** @brief Prepare a bounded immutable snapshot from borrowed inputs; failures are redacted. */
+/** @brief Admit bounded caller controls and delegate one store transaction.
+ * @returns An owned snapshot or a redacted GitError; native handles remain internal. */
 pub static method(Git) PrepareSnapshot(
   origin: ref string,
   revision: ref string,
@@ -27,8 +22,8 @@ pub static method(Git) PrepareSnapshot(
     || store.length == 0
     || timeout_ms < 1
     || timeout_ms > 120000 {
-    return git_error(GitError.InvalidArgument);
+    return Err<GitSnapshot, GitError>(GitError.InvalidArgument);
   }
 
-  return GitPrepareStoredSnapshot(origin, revision, store, offline, timeout_ms);
+  return GitStore.New(store, offline, timeout_ms).Prepare(origin, revision);
 }

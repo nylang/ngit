@@ -132,7 +132,7 @@ def build(output: Path, openssl: Path, *, cc: str | None = None) -> dict:
     ssl_license = next((p for p in (openssl / "LICENSE.txt", openssl / "LICENSE") if p.exists()), None)
     if ssl_license:
         shutil.copy2(ssl_license, licenses / "OpenSSL-LICENSE.txt")
-    result = {'package': 'ngit', 'version': '0.1.0', 'libgit2': pin,
+    result = {'package': 'ngit', 'version': '0.2.0', 'libgit2': pin,
               'native_libraries': {str(p): sha(p) for p in libraries},
               'bridge_source_sha256': sha(ROOT / 'private/native/git_bridge.c'),
               'windows_paths_source_sha256': sha(ROOT / 'private/native/windows_paths.h') if windows else None,

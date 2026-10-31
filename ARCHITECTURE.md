@@ -7,15 +7,17 @@ in callers. The source implementation separates store transactions from libgit2.
 - `public/git.ny` owns snapshot identity values and accessors. It neither calls
   native functions nor parses their result framing.
 - `private/acquire.ny` admits public controls and starts one store operation.
-- `private/store.ny` owns cache layout, input/origin admission, origin/content
+- `private/store.ny` defines `GitStore`, retaining its root and provider controls.
+  It owns cache layout, input/origin admission, origin/content
   locks, stale own-origin stage reclamation, repository publication and immutable
   content publication. `GitStage` drops only its own stage. Its origin `FileLock`
   stays alive through cleanup; the content lock covers final publication.
   Reclamation inspects entry kinds without following links, removes only the
   matching origin's stages and preserves unrelated origin stages.
-- `private/provider.ny` adapts bounded native hash/clone/resolve/export operations
+- `private/provider.ny` defines `GitProvider`, retaining offline/timeout controls.
+  It adapts bounded native hash/clone/resolve/export operations
   into typed results. It copies native output before temporary buffers drop.
-- `private/result.ny` validates framing, hexadecimal identities, canonical paths
+- `private/result.ny` gives `GitSnapshot` its typed decoder, which validates framing, hexadecimal identities, canonical paths
   and exact requested commits. It consumes immutable owned text and performs no
   repository/store mutation.
 - `private/git_c.ni` and `private/native/git_bridge.{c,h}` own the private provider
@@ -66,3 +68,22 @@ Acceptance uses a focused native development compiler and the matching source
 stdlib/platform ABI 10; it does not qualify the whole parent compiler refactor
 or a distributable SDK. Windows, Linux and Intel execution, SDK qualification
 and publication remain separate gates. See README for repeatable test commands.
+
+## 1.0.5 ownership increment
+
+`GitStore` owns transaction policy, `GitProvider` owns native controls,
+`GitSnapshot.Decode` validates owned output, and `GitError.FromProviderStatus`
+maps native status. `GitStage.Reclaim` owns stage-selection policy; generic
+no-follow removal delegates to stdlib `Path.DeleteTreeNoFollow`. Entry
+classification and deletion are separate operations, so path replacement must
+remain serialized by the caller's store/origin locks.
+
+The established stateless `Git` public admission namespace is retained as an
+explicit compatibility exception and delegates directly to these owners. No new
+empty helper namespace or C policy implementation is introduced. Native provider
+symbols/archive inputs and public Git snapshot value layouts stay unchanged.
+This increment requires matching 1.0.5 source stdlib; the earlier 1.0.4 requirement
+above describes the historical closeout. Five package units, 24 package-manager
+smoke checks and 40 controlled Git/cache checks pass on macOS arm64. The parent
+receipt is `docs/roadmaps/m_v1.0.5/ngit-owner-refactor.json`; other hosts, full SDK
+qualification and package publication remain separate.
